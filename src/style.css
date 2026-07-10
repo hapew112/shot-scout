@@ -1,34 +1,362 @@
-/* Shot Scout — base styles (scaffold) */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* ── Design Tokens ─────────────────────────────── */
 :root {
-  --color-bg: #0d0d0d;
-  --color-surface: #1a1a1a;
-  --color-accent: #e8c77d;
-  --color-text: #f0f0f0;
-  --color-muted: #888;
+  --bg:        #080808;
+  --surface:   rgba(255,255,255,.06);
+  --surface2:  rgba(255,255,255,.10);
+  --border:    rgba(255,255,255,.10);
+  --accent:    #e8c77d;
+  --accent2:   #f0a500;
+  --text:      #f2f2f2;
+  --muted:     rgba(255,255,255,.45);
+  --danger:    #e57373;
+  --safe:      #81c784;
+  --radius-sm: 10px;
+  --radius:    16px;
+  --radius-lg: 24px;
+  --nav-h:     64px;
+  --panel-h:   220px;
   font-family: 'Inter', system-ui, sans-serif;
-  font-size: 16px;
   color-scheme: dark;
 }
 
-*, *::before, *::after {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
+/* ── Reset ──────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%; height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
 }
 
-body {
-  background: var(--color-bg);
-  color: var(--color-text);
-  min-height: 100dvh;
+/* ── Layout ─────────────────────────────────────── */
+#app {
   display: flex;
   flex-direction: column;
+  width: 100vw;
+  height: 100dvh;
+  position: relative;
 }
 
-#app {
+/* ── Camera view ────────────────────────────────── */
+#camera-wrap {
+  position: relative;
+  flex: 1;
+  overflow: hidden;
+  background: #000;
+}
+
+#video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+#overlay-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/* ── Camera placeholder (no stream) ─────────────── */
+#cam-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--muted);
+  font-size: .9rem;
+}
+#cam-placeholder svg { width: 48px; height: 48px; opacity: .4; }
+#cam-placeholder.hidden { display: none; }
+
+/* ── Top HUD bar ─────────────────────────────────── */
+#top-bar {
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  background: linear-gradient(to bottom, rgba(0,0,0,.7) 0%, transparent 100%);
+  z-index: 10;
+}
+
+#app-title {
+  font-size: .8rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+
+/* ── Profile pill selector ───────────────────────── */
+#profile-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  backdrop-filter: blur(12px);
+  border-radius: 999px;
+  padding: 6px 12px 6px 10px;
+  cursor: pointer;
+  transition: background .15s;
+}
+#profile-pill:hover { background: var(--surface2); }
+#profile-pill-label { font-size: .78rem; font-weight: 600; max-width: 140px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#profile-pill svg { flex-shrink: 0; opacity: .6; }
+
+/* ── Solar & ratio inline HUDs ───────────────────── */
+#solar-hud, #ratio-hud {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(var(--panel-h) + 80px);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.hud-value {
+  font-size: 2.4rem;
+  font-weight: 700;
+  letter-spacing: -.03em;
+  line-height: 1;
+  text-shadow: 0 2px 12px rgba(0,0,0,.8);
+}
+.hud-sub {
+  font-size: .75rem;
+  color: var(--muted);
+  text-align: center;
+  text-shadow: 0 1px 6px rgba(0,0,0,.9);
+}
+
+/* Compass ring */
+#compass-ring {
+  width: 80px; height: 80px;
+  position: relative;
+}
+#compass-ring svg {
+  width: 100%; height: 100%;
+  filter: drop-shadow(0 2px 8px rgba(0,0,0,.6));
+}
+
+/* ── Bottom Nav ──────────────────────────────────── */
+#bottom-nav {
+  position: absolute;
+  bottom: 0; left: 0; right: 0;
+  z-index: 20;
+}
+
+.nav-tabs {
+  display: flex;
+  background: rgba(8,8,8,.85);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid var(--border);
+}
+
+.nav-tab {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 2rem;
+  gap: 3px;
+  padding: 10px 0 calc(10px + env(safe-area-inset-bottom, 0px));
+  cursor: pointer;
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: .65rem;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  transition: color .15s;
 }
+.nav-tab svg { width: 22px; height: 22px; }
+.nav-tab.active { color: var(--accent); }
+.nav-tab.active svg path, .nav-tab.active svg circle,
+.nav-tab.active svg rect { stroke: var(--accent); }
+
+/* ── Bottom Panel ─────────────────────────────────── */
+#panel {
+  background: rgba(8,8,8,.92);
+  backdrop-filter: blur(24px);
+  border-top: 1px solid var(--border);
+  height: var(--panel-h);
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.panel-section { display: none; flex-direction: column; gap: 12px; }
+.panel-section.active { display: flex; }
+
+/* ── Info row ─────────────────────────────────────── */
+.info-row {
+  display: flex;
+  gap: 8px;
+}
+.info-chip {
+  flex: 1;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.info-chip .label { font-size: .65rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.info-chip .value { font-size: 1rem; font-weight: 700; }
+
+/* ── Slider row ───────────────────────────────────── */
+.slider-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.slider-label { font-size: .72rem; color: var(--muted); white-space: nowrap; min-width: 90px; }
+input[type=range] {
+  -webkit-appearance: none;
+  flex: 1;
+  height: 4px;
+  background: var(--surface2);
+  border-radius: 4px;
+  outline: none;
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 18px; height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+}
+.slider-val { font-size: .8rem; font-weight: 600; min-width: 36px; text-align: right; }
+
+/* ── Buttons ──────────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 18px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: .82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background .15s, transform .1s;
+  white-space: nowrap;
+}
+.btn:active { transform: scale(.97); }
+.btn.primary { background: var(--accent); color: #000; border-color: transparent; }
+.btn.danger  { border-color: var(--danger); color: var(--danger); }
+
+/* ── Select ───────────────────────────────────────── */
+select {
+  width: 100%;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  font-size: .85rem;
+  font-family: inherit;
+  outline: none;
+}
+
+/* ── Modal ────────────────────────────────────────── */
+#modal-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.75);
+  backdrop-filter: blur(6px);
+  z-index: 100;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+#modal-backdrop.hidden { display: none; }
+
+.modal-sheet {
+  background: #111;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  width: 100%;
+  max-width: 500px;
+  padding: 24px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.modal-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.modal-row { display: flex; flex-direction: column; gap: 5px; }
+.modal-row label { font-size: .72rem; color: var(--muted); }
+.modal-row input, .modal-row select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  padding: 10px 12px;
+  font-size: .9rem;
+  font-family: inherit;
+  outline: none;
+  width: 100%;
+}
+.modal-actions { display: flex; gap: 10px; margin-top: 4px; }
+.modal-actions .btn { flex: 1; }
+
+/* ── Permission toast ─────────────────────────────── */
+#toast {
+  position: fixed;
+  bottom: calc(var(--panel-h) + var(--nav-h) + 16px);
+  left: 50%; transform: translateX(-50%);
+  background: rgba(30,30,30,.95);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 10px 18px;
+  font-size: .82rem;
+  color: var(--muted);
+  z-index: 50;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .3s;
+}
+#toast.show { opacity: 1; }
+
+/* ── Ratio label pill ─────────────────────────────── */
+.ratio-badge {
+  font-size: .7rem;
+  font-weight: 700;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid currentColor;
+}
+
+/* ── Animations ───────────────────────────────────── */
+@keyframes fadeIn { from { opacity:0; transform:translateY(4px) } to { opacity:1; transform:none } }
+.panel-section.active { animation: fadeIn .18s ease; }

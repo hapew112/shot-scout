@@ -274,7 +274,7 @@ function bindEvents() {
     try {
       const c = await getCurrentPosition()
       geoCoords = { lat: c.latitude, lon: c.longitude }
-      showToast(`위치: ${c.latitude.toFixed(4)}, ${c.longitude.toFixed(4)}`)
+      showToast(`위치 확인됨 (약 1km 정밀도)`)
     } catch { showToast('위치 권한이 필요합니다') }
   })
 
@@ -366,8 +366,8 @@ function measureRatioFromVideo() {
   ;(document.getElementById('ratio-badge') as HTMLElement).style.color = result.color
   ;(document.getElementById('ratio-hint') as HTMLElement).textContent = result.hint
   ;(document.getElementById('ratio-chip-val') as HTMLElement).textContent = ratioStr
-  ;(document.getElementById('lum-l-val') as HTMLElement).textContent = result.leftLum.toFixed(0)
-  ;(document.getElementById('lum-r-val') as HTMLElement).textContent = result.rightLum.toFixed(0)
+  ;(document.getElementById('lum-l-val') as HTMLElement).textContent = `${(result.leftLum * 100).toFixed(0)}%`
+  ;(document.getElementById('lum-r-val') as HTMLElement).textContent = `${(result.rightLum * 100).toFixed(0)}%`
   ;(document.getElementById('ratio-preset-hint') as HTMLElement).textContent = result.hint
 }
 

@@ -46,7 +46,7 @@ export function getSolarPosition(
     -Math.sin(HRad),
     Math.cos(latRad) * Math.tan(declRad) - Math.sin(latRad) * Math.cos(HRad)
   )
-  const azimuth = mod(toDeg(azRad) + 180, 360)
+  const azimuth = mod(toDeg(azRad), 360)
 
   return { azimuth, elevation }
 }

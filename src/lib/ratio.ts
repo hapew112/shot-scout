@@ -1,4 +1,4 @@
-export type RatioLabel = 'flat' | 'soft' | 'rembrandt' | 'split' | 'extreme'
+export type RatioLabel = 'flat' | 'soft' | 'rembrandt' | 'hard' | 'split'
 
 export interface RatioResult {
   leftLum: number
@@ -9,8 +9,11 @@ export interface RatioResult {
   color: string
 }
 
+// 조명비는 선형 광량 기준 — sRGB 감마를 풀지 않으면 실제 4:1이 ~1.9:1로 나옴
+const linear = (v: number) => Math.pow(v / 255, 2.2)
+
 function luminance(r: number, g: number, b: number): number {
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b
+  return 0.2126 * linear(r) + 0.7152 * linear(g) + 0.0722 * linear(b)
 }
 
 function avgLuminance(data: Uint8ClampedArray, xStart: number, xEnd: number, yStart: number, yEnd: number, width: number): number {
@@ -53,11 +56,11 @@ export function measureRatio(
   const ratio = hi / lo
 
   let label: RatioLabel, hint: string, color: string
-  if (ratio < 1.5)       { label='flat';      hint='균일한 조명';                  color='#64b5f6' }
-  else if (ratio < 2.5)  { label='soft';      hint='소프트 — 정면/45° 조명';       color='#81c784' }
-  else if (ratio < 5.5)  { label='rembrandt'; hint='렘브란트 — 측면 45° 조명';     color='#ffd54f' }
-  else if (ratio < 9)    { label='split';     hint='스플릿 — 측면 90° 조명';       color='#ff8a65' }
-  else                   { label='extreme';   hint='과도한 대비';                  color='#e57373' }
+  if (ratio < 2)         { label='flat';      hint='균일한 조명';                  color='#64b5f6' }
+  else if (ratio < 4)    { label='soft';      hint='소프트 사이드 (2:1~4:1)';      color='#81c784' }
+  else if (ratio < 6)    { label='rembrandt'; hint='렘브란트 (4:1~6:1)';           color='#ffd54f' }
+  else if (ratio < 8)    { label='hard';      hint='렘브란트↔스플릿 사이';         color='#ff8a65' }
+  else                   { label='split';     hint='스플릿 하드 (8:1+)';           color='#e57373' }
 
   // 방향 힌트
   const dir = leftLum > rightLum ? '왼쪽' : '오른쪽'

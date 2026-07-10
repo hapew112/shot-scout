@@ -26,7 +26,7 @@ let video2: HTMLVideoElement
 let canvas2: HTMLCanvasElement
 let ctx2: CanvasRenderingContext2D
 const offCanvas = new OffscreenCanvas(1, 1)
-const offCtx   = offCanvas.getContext('2d')!
+const offCtx   = offCanvas.getContext('2d', { willReadFrequently: true })!
 
 // ── App HTML ──────────────────────────────────────
 document.getElementById('app')!.innerHTML = `
@@ -293,10 +293,14 @@ function bindEvents() {
 }
 
 // ── Overlay canvas draw ───────────────────────────
+let _lastW = 0; let _lastH = 0
 function drawOverlay() {
   const el = document.getElementById('camera-wrap')!
   const W = el.offsetWidth; const H = el.offsetHeight
-  canvas2.width = W; canvas2.height = H
+  if (W !== _lastW || H !== _lastH) {
+    canvas2.width = W; canvas2.height = H
+    _lastW = W; _lastH = H
+  }
 
   ctx2.clearRect(0, 0, W, H)
 
@@ -458,7 +462,7 @@ function showToast(msg: string) {
 function loop(ts: number) {
   drawOverlay()
   if (mode === 'solar') updateSolar()
-  if (mode === 'ratio' && ts - ratioThrottle > 500) {
+  if (mode === 'ratio' && ts - ratioThrottle > 1500) {
     measureRatioFromVideo()
     ratioThrottle = ts
   }

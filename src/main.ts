@@ -12,6 +12,33 @@ import {
   getActiveProfile, setActiveProfileId, createProfile, profileHfov, SENSOR_PRESETS,
 } from './store/profiles'
 
+// ── Snapshot store ────────────────────────────────
+interface SnapshotEntry {
+  id: string
+  ts: number           // epoch ms
+  time: string         // ISO string
+  solarElev: number | null
+  solarAz: number | null
+  ratio: number | null
+  lens: string | null  // profile name
+  lat: number | null   // 절사 소수 2자리 (프라이버시)
+  lon: number | null
+}
+const SNAP_KEY = 'shot-scout-snapshots'
+function loadSnapshots(): SnapshotEntry[] {
+  try { return JSON.parse(localStorage.getItem(SNAP_KEY) ?? '[]') } catch { return [] }
+}
+function saveSnapshot(s: SnapshotEntry): void {
+  const list = loadSnapshots()
+  list.unshift(s)
+  if (list.length > 50) list.splice(50)
+  localStorage.setItem(SNAP_KEY, JSON.stringify(list))
+}
+function deleteSnapshot(id: string): void {
+  const list = loadSnapshots().filter(s => s.id !== id)
+  localStorage.setItem(SNAP_KEY, JSON.stringify(list))
+}
+
 // ── State ─────────────────────────────────────────
 let mode: 'lens' | 'solar' | 'ratio' = 'lens'
 let activeProfile: LensProfile | null = null
@@ -42,18 +69,21 @@ document.getElementById('app')!.innerHTML = `
     </svg>
     <span>카메라 시작을 눌러주세요</span>
   </div>
-  <div id="top-bar">
-    <span id="app-title">Shot Scout</span>
-    <div id="profile-pill">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="3"/><path d="M3 12h1m16 0h1M12 3v1m0 16v1"/>
-      </svg>
-      <span id="profile-pill-label">프로필 없음</span>
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="6 9 12 15 18 9"/>
-      </svg>
+    <div id="top-bar">
+      <span id="app-title">Shot Scout</span>
+      <div style="display:flex;gap:8px;align-items:center">
+        <button id="btn-snap-list" style="background:none;border:none;cursor:pointer;color:var(--accent);font-size:1.1rem;line-height:1;padding:4px" title="스냅슷 목록">📄</button>
+        <div id="profile-pill">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"/><path d="M3 12h1m16 0h1M12 3v1m0 16v1"/>
+          </svg>
+          <span id="profile-pill-label">프로필 없음</span>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="6 9 12 15 18 9"/>
+          </svg>
+        </div>
+      </div>
     </div>
-  </div>
   <div id="solar-hud" style="display:none">
     <div id="compass-ring">
       <svg viewBox="0 0 80 80">
@@ -124,6 +154,7 @@ document.getElementById('app')!.innerHTML = `
       <div style="display:flex;gap:8px">
         <button class="btn primary" id="btn-cam" style="flex:1">📷 카메라 시작</button>
         <button class="btn" id="btn-add-profile">+ 프로필</button>
+        <button class="btn" id="btn-save-snap" title="스냅슷 저장">📌</button>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <span style="font-size:.7rem;color:var(--muted);flex:1">카메라 방향</span>
@@ -201,6 +232,17 @@ document.getElementById('app')!.innerHTML = `
 </div>
 
 <div id="toast"></div>
+
+<!-- Snapshot modal -->
+<div id="snap-modal-backdrop" class="hidden">
+  <div class="modal-sheet">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <div class="modal-title">스냅슷 기록</div>
+      <button class="btn" id="btn-close-snap-modal" style="padding:6px 12px;font-size:.78rem">닫기</button>
+    </div>
+    <div id="snap-list" style="display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow-y:auto"></div>
+  </div>
+</div>
 `
 
 // ── Wire up DOM refs after innerHTML ────────────────
@@ -370,6 +412,42 @@ function bindEvents() {
     ;(document.getElementById('inp-name') as HTMLInputElement).value = `${model}${focal ? ' + ' + focal : ''}${fn}`
     showToast('EXIF 자동 입력 완료')
     inpCameraPhoto.value = ''
+  })
+
+  // Snapshot save
+  document.getElementById('btn-save-snap')!.addEventListener('click', () => {
+    const now = new Date()
+    const solarEl = geoCoords
+      ? getSolarPosition(now, geoCoords.lat, geoCoords.lon).elevation
+      : null
+    const solarAz = geoCoords
+      ? getSolarPosition(now, geoCoords.lat, geoCoords.lon).azimuth
+      : null
+    const ratioValEl = document.getElementById('ratio-chip-val')
+    const ratioNum = ratioValEl ? parseFloat(ratioValEl.textContent ?? '') : null
+    const entry: SnapshotEntry = {
+      id: `${now.getTime()}`,
+      ts: now.getTime(),
+      time: now.toISOString(),
+      solarElev: solarEl ? Math.round(solarEl * 10) / 10 : null,
+      solarAz: solarAz ? Math.round(solarAz * 10) / 10 : null,
+      ratio: isNaN(ratioNum!) ? null : ratioNum,
+      lens: activeProfile?.name ?? null,
+      lat: geoCoords ? Math.floor(geoCoords.lat * 100) / 100 : null,
+      lon: geoCoords ? Math.floor(geoCoords.lon * 100) / 100 : null,
+    }
+    saveSnapshot(entry)
+    showToast('스냅슷 저장됨')
+  })
+
+  // Snapshot list
+  document.getElementById('btn-snap-list')!.addEventListener('click', openSnapshotModal)
+  document.getElementById('btn-close-snap-modal')!.addEventListener('click', () => {
+    document.getElementById('snap-modal-backdrop')!.classList.add('hidden')
+  })
+  document.getElementById('snap-modal-backdrop')!.addEventListener('click', e => {
+    if (e.target === e.currentTarget)
+      document.getElementById('snap-modal-backdrop')!.classList.add('hidden')
   })
 
   // Geo button
@@ -559,7 +637,48 @@ function refreshUI() {
   updateLensInfo()
 }
 
-// ── Modal ─────────────────────────────────────────
+// ── Snapshot modal ────────────────────────────────
+function openSnapshotModal() {
+  renderSnapList()
+  document.getElementById('snap-modal-backdrop')!.classList.remove('hidden')
+}
+function renderSnapList() {
+  const list = loadSnapshots()
+  const el = document.getElementById('snap-list')!
+  if (list.length === 0) {
+    el.innerHTML = '<p style="color:var(--muted);font-size:.82rem;text-align:center;padding:20px">저장된 스냅슷이 없습니다</p>'
+    return
+  }
+  el.innerHTML = list.map(s => {
+    const d = new Date(s.ts)
+    const dateStr = d.toLocaleDateString('ko', { month:'2-digit', day:'2-digit' })
+    const timeStr = d.toLocaleTimeString('ko', { hour:'2-digit', minute:'2-digit' })
+    const rows = [
+      s.lens ? `🔦 ${s.lens}` : '',
+      s.solarElev != null ? `☀️ 고도 ${s.solarElev}° / 방위각 ${s.solarAz}°` : '',
+      s.ratio != null ? `📊 레이시오 ${s.ratio.toFixed(1)}:1` : '',
+      s.lat != null ? `📍 ${s.lat}, ${s.lon}` : '',
+    ].filter(Boolean).join('<br>')
+    return `<div class="snap-entry" data-id="${s.id}">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px">
+        <div>
+          <div style="font-size:.72rem;color:var(--muted);margin-bottom:4px">${dateStr} ${timeStr}</div>
+          <div style="font-size:.78rem;line-height:1.6">${rows || '데이터 없음'}</div>
+        </div>
+        <button class="btn danger snap-delete" data-id="${s.id}" style="padding:4px 10px;font-size:.72rem;white-space:nowrap">삭제</button>
+      </div>
+    </div>`
+  }).join('')
+
+  el.querySelectorAll<HTMLButtonElement>('.snap-delete').forEach(btn => {
+    btn.addEventListener('click', () => {
+      deleteSnapshot(btn.dataset.id!)
+      renderSnapList()
+    })
+  })
+}
+
+// ── Modal ────────────────────────────────────
 function openProfileModal() {
   const modal = document.getElementById('modal-backdrop')!
   const sel   = document.getElementById('modal-profile-select') as HTMLSelectElement

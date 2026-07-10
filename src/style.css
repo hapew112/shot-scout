@@ -368,3 +368,11 @@ select {
   padding: 8px 6px;
   white-space: nowrap;
 }
+
+/* ── Snapshot entry card ─────────────────────────── */
+.snap-entry {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}

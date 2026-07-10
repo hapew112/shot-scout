@@ -1,6 +1,6 @@
 import './style.css'
 import { startCamera, stopCamera } from './lib/camera'
-import { dofText, overlayScale } from './lib/optics'
+import { dofText, overlayScale, horizontalFov, sensorHeightMm, verticalFovFromH } from './lib/optics'
 import { getSolarPosition, azimuthLabel } from './lib/solar'
 import { getCurrentPosition } from './lib/geo'
 import { requestOrientationPermission, getCompassHeading } from './lib/orientation'
@@ -302,9 +302,13 @@ function drawOverlay() {
 
   if (!activeProfile) return
 
+  // 가로는 렌즈/폰 수평 FOV 비율, 세로는 센서 종횡비(3:2 등) 기반 수직 FOV 비율 — 실제 프레임 모양 유지
   const lensHfov = profileHfov(activeProfile)
-  const scale = Math.min(overlayScale(lensHfov, phoneFovH), 1)
-  const rw = W * scale; const rh = H * scale
+  const lensVfov = horizontalFov(activeProfile.focalMm, sensorHeightMm(activeProfile.sensorWidthMm))
+  const phoneVfov = verticalFovFromH(phoneFovH, W / H)
+  const scaleX = Math.min(overlayScale(lensHfov, phoneFovH), 1)
+  const scaleY = Math.min(overlayScale(lensVfov, phoneVfov), 1)
+  const rw = W * scaleX; const rh = H * scaleY
   const rx = (W - rw) / 2; const ry = (H - rh) / 2
 
   // Dark vignette outside frame
@@ -357,7 +361,18 @@ function measureRatioFromVideo() {
   if (!cameraStarted || !video2.videoWidth) return
   offCanvas.width = video2.videoWidth; offCanvas.height = video2.videoHeight
   offCtx.drawImage(video2, 0, 0)
-  const result = measureRatio(offCtx, offCanvas.width, offCanvas.height)
+
+  // object-fit: cover로 화면에 보이는 영역만 계산 대상 — 화면에 그린 가이드 박스와 일치시킴
+  const wrap = document.getElementById('camera-wrap')!
+  const va = video2.videoWidth / video2.videoHeight
+  const da = wrap.offsetWidth / Math.max(wrap.offsetHeight, 1)
+  let vx = 0, vy = 0, vw = video2.videoWidth, vh = video2.videoHeight
+  if (va > da) { vw = vh * da; vx = (video2.videoWidth - vw) / 2 }
+  else         { vh = vw / da; vy = (video2.videoHeight - vh) / 2 }
+
+  const result = measureRatio(offCtx, {
+    x: vx + vw * 0.2, y: vy + vh * 0.2, w: vw * 0.6, h: vh * 0.6,
+  })
 
   const ratioStr = `${result.ratio.toFixed(1)} : 1`
   ;(document.getElementById('ratio-val') as HTMLElement).textContent = ratioStr

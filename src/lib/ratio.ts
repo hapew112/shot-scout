@@ -28,17 +28,16 @@ function avgLuminance(data: Uint8ClampedArray, xStart: number, xEnd: number, ySt
   return count > 0 ? sum / count : 0
 }
 
+export interface SampleBox { x: number; y: number; w: number; h: number }
+
 export function measureRatio(
   ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D,
-  cw: number,
-  ch: number
+  box: SampleBox
 ): RatioResult {
-  // 가이드 박스: 화면 중앙 60%×60%
-  const bx = Math.floor(cw * 0.2)
-  const by = Math.floor(ch * 0.2)
-  const bw = Math.floor(cw * 0.6)
-  const bh = Math.floor(ch * 0.6)
-
+  const bx = Math.floor(box.x)
+  const by = Math.floor(box.y)
+  const bw = Math.floor(box.w)
+  const bh = Math.floor(box.h)
 
   let data: Uint8ClampedArray
   try {

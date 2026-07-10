@@ -22,6 +22,7 @@ let cameraStarted = false
 let ratioThrottle = 0
 let orientationBound = false
 let cameraLandscape = true   // true=가로(기본), false=세로
+let ratioTarget: { min: number; max: number; name: string } | null = null
 
 // ── DOM refs (assigned after innerHTML) ─────────────
 let video2: HTMLVideoElement
@@ -153,9 +154,16 @@ document.getElementById('app')!.innerHTML = `
         <div class="info-chip"><span class="label">좌 휘도</span><span class="value" id="lum-l-val">--</span></div>
         <div class="info-chip"><span class="label">우 휘도</span><span class="value" id="lum-r-val">--</span></div>
       </div>
-      <div class="info-chip" style="padding:12px">
-        <span class="label">프리셋</span>
-        <span style="font-size:.85rem;margin-top:4px" id="ratio-preset-hint">카메라를 시작하면 측정됩니다</span>
+      <div style="display:flex;gap:6px">
+        <span style="font-size:.65rem;color:var(--muted);white-space:nowrap;align-self:center">목표</span>
+        <button class="btn ratio-preset-btn" id="preset-any" data-min="0" data-max="99" data-name="없음">없음</button>
+        <button class="btn ratio-preset-btn" id="preset-soft" data-min="2" data-max="4" data-name="소프트">소프트</button>
+        <button class="btn ratio-preset-btn" id="preset-rembrandt" data-min="4" data-max="6" data-name="렌브란트">렌브란트</button>
+        <button class="btn ratio-preset-btn" id="preset-split" data-min="8" data-max="99" data-name="스플릿">스플릿</button>
+      </div>
+      <div class="info-chip" style="padding:10px 12px">
+        <span class="label">힙트</span>
+        <span style="font-size:.82rem;margin-top:4px" id="ratio-preset-hint">카메라를 시작하면 측정됩니다</span>
       </div>
     </div>
   </div>
@@ -269,6 +277,18 @@ function bindEvents() {
         ;(document.getElementById('btn-cam') as HTMLButtonElement).textContent = '⏹ 카메라 종료'
       } catch { showToast('카메라 권한이 필요합니다') }
     }
+  })
+
+  // Ratio preset buttons
+  document.querySelectorAll<HTMLButtonElement>('.ratio-preset-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const min  = Number(btn.dataset.min ?? 0)
+      const max  = Number(btn.dataset.max ?? 99)
+      const name = btn.dataset.name ?? ''
+      ratioTarget = name === '없음' ? null : { min, max, name }
+      document.querySelectorAll('.ratio-preset-btn').forEach(b => b.classList.remove('primary'))
+      btn.classList.add('primary')
+    })
   })
 
   // Camera orientation toggle
@@ -467,15 +487,31 @@ function measureRatioFromVideo() {
   })
 
   const ratioStr = `${result.ratio.toFixed(1)} : 1`
+
+  // 목표 프리셋 기준 색상/힙트 판정
+  let displayColor = result.color
+  let displayHint  = result.hint
+  if (ratioTarget && ratioTarget.name !== '없음') {
+    const inRange = result.ratio >= ratioTarget.min && result.ratio <= ratioTarget.max
+    displayColor = inRange ? '#81c784' : '#e57373'
+    if (inRange) {
+      displayHint = `✅ 목표 레인에 쟁습니다 (${ratioTarget.name})`
+    } else if (result.ratio < ratioTarget.min) {
+      displayHint = `⬆ 더 측면으로 돌리세요 — 목표 ${ratioTarget.name} (${ratioTarget.min}:1~${ratioTarget.max === 99 ? '+' : ratioTarget.max + ':1'})`
+    } else {
+      displayHint = `⬇ 조명을 더 영어주세요 — 목표 ${ratioTarget.name} (${ratioTarget.min}:1~${ratioTarget.max === 99 ? '+' : ratioTarget.max + ':1'})`
+    }
+  }
+
   ;(document.getElementById('ratio-val') as HTMLElement).textContent = ratioStr
-  ;(document.getElementById('ratio-val') as HTMLElement).style.color = result.color
+  ;(document.getElementById('ratio-val') as HTMLElement).style.color = displayColor
   ;(document.getElementById('ratio-badge') as HTMLElement).textContent = result.label
-  ;(document.getElementById('ratio-badge') as HTMLElement).style.color = result.color
-  ;(document.getElementById('ratio-hint') as HTMLElement).textContent = result.hint
+  ;(document.getElementById('ratio-badge') as HTMLElement).style.color = displayColor
+  ;(document.getElementById('ratio-hint') as HTMLElement).textContent = displayHint
   ;(document.getElementById('ratio-chip-val') as HTMLElement).textContent = ratioStr
   ;(document.getElementById('lum-l-val') as HTMLElement).textContent = `${(result.leftLum * 100).toFixed(0)}%`
   ;(document.getElementById('lum-r-val') as HTMLElement).textContent = `${(result.rightLum * 100).toFixed(0)}%`
-  ;(document.getElementById('ratio-preset-hint') as HTMLElement).textContent = result.hint
+  ;(document.getElementById('ratio-preset-hint') as HTMLElement).textContent = displayHint
 }
 
 // ── Solar update ──────────────────────────────────

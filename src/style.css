@@ -360,3 +360,11 @@ select {
 /* ── Animations ───────────────────────────────────── */
 @keyframes fadeIn { from { opacity:0; transform:translateY(4px) } to { opacity:1; transform:none } }
 .panel-section.active { animation: fadeIn .18s ease; }
+
+/* ── Ratio preset buttons ─────────────────────────── */
+.ratio-preset-btn {
+  flex: 1;
+  font-size: .7rem;
+  padding: 8px 6px;
+  white-space: nowrap;
+}

@@ -1,0 +1,25 @@
+{
+  "name": "Shot Scout",
+  "short_name": "ShotScout",
+  "description": "야외촬영 사전답사 PWA — 화각 오버레이, 태양 위치, 라이팅 레이시오",
+  "start_url": "/shot-scout/",
+  "scope": "/shot-scout/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0d0d0d",
+  "theme_color": "#0d0d0d",
+  "icons": [
+    {
+      "src": "/shot-scout/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/shot-scout/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

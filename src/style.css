@@ -1,0 +1,34 @@
+/* Shot Scout — base styles (scaffold) */
+:root {
+  --color-bg: #0d0d0d;
+  --color-surface: #1a1a1a;
+  --color-accent: #e8c77d;
+  --color-text: #f0f0f0;
+  --color-muted: #888;
+  font-family: 'Inter', system-ui, sans-serif;
+  font-size: 16px;
+  color-scheme: dark;
+}
+
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
+#app {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}

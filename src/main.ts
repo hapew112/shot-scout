@@ -21,6 +21,7 @@ let compassHeading = 0
 let cameraStarted = false
 let ratioThrottle = 0
 let orientationBound = false
+let cameraLandscape = true   // true=가로(기본), false=세로
 
 // ── DOM refs (assigned after innerHTML) ─────────────
 let video2: HTMLVideoElement
@@ -122,6 +123,11 @@ document.getElementById('app')!.innerHTML = `
       <div style="display:flex;gap:8px">
         <button class="btn primary" id="btn-cam" style="flex:1">📷 카메라 시작</button>
         <button class="btn" id="btn-add-profile">+ 프로필</button>
+      </div>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span style="font-size:.7rem;color:var(--muted);flex:1">카메라 방향</span>
+        <button class="btn" id="btn-orient-landscape" style="flex:1;font-size:.75rem">📸 가로</button>
+        <button class="btn" id="btn-orient-portrait" style="flex:1;font-size:.75rem">📸 세로</button>
       </div>
     </div>
     <!-- Solar panel -->
@@ -265,6 +271,21 @@ function bindEvents() {
     }
   })
 
+  // Camera orientation toggle
+  function updateOrientBtns() {
+    const bl = document.getElementById('btn-orient-landscape')!
+    const bp = document.getElementById('btn-orient-portrait')!
+    bl.classList.toggle('primary', cameraLandscape)
+    bp.classList.toggle('primary', !cameraLandscape)
+  }
+  updateOrientBtns()
+  document.getElementById('btn-orient-landscape')!.addEventListener('click', () => {
+    cameraLandscape = true; updateOrientBtns(); showToast('카메라 가로 모드')
+  })
+  document.getElementById('btn-orient-portrait')!.addEventListener('click', () => {
+    cameraLandscape = false; updateOrientBtns(); showToast('카메라 세로 모드')
+  })
+
   // Dist slider
   const distSlider = document.getElementById('dist-slider') as HTMLInputElement
   distSlider.addEventListener('input', () => {
@@ -368,10 +389,15 @@ function drawOverlay() {
 
   if (!activeProfile) return
 
-  // 가로는 렌즈/폰 수평 FOV 비율, 세로는 센서 종횡비(3:2 등) 기반 수직 FOV 비율 — 실제 프레임 모양 유지
-  const lensHfov = profileHfov(activeProfile)
-  const lensVfov = horizontalFov(activeProfile.focalMm, sensorHeightMm(activeProfile.sensorWidthMm))
+  // 방향 토글: 카메라 가로 = 센서 36mm 축이 화면 가로
+  // 카메라 세로 = 센서 장축이 화면 세로 → hfov/vfov 축 스왑
+  const lensH = profileHfov(activeProfile)          // 렌즈 수평 FOV
+  const lensV = horizontalFov(activeProfile.focalMm, sensorHeightMm(activeProfile.sensorWidthMm))  // 렌즈 수직 FOV
   const phoneVfov = verticalFovFromH(phoneFovH, W / H)
+
+  // 카메라 세로일 때: 렌즈의 긴 축(vfov)이 폰 화면 가로 방향, 짧은 축(hfov)이 폰 화면 세로 방향
+  const lensHfov = cameraLandscape ? lensH : lensV
+  const lensVfov = cameraLandscape ? lensV : lensH
   const scaleX = Math.min(overlayScale(lensHfov, phoneFovH), 1)
   const scaleY = Math.min(overlayScale(lensVfov, phoneVfov), 1)
   const rw = W * scaleX; const rh = H * scaleY

@@ -12,6 +12,10 @@ import {
   getActiveProfile, setActiveProfileId, createProfile, profileHfov, SENSOR_PRESETS,
 } from './store/profiles'
 
+// EXIF 모델명 등 외부 파일 유래 문자열이 innerHTML로 들어가는 지점 이스케이프
+const esc = (s: string) => s.replace(/[&<>"']/g, c =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
+
 // ── Snapshot store ────────────────────────────────
 interface SnapshotEntry {
   id: string
@@ -72,7 +76,7 @@ document.getElementById('app')!.innerHTML = `
     <div id="top-bar">
       <span id="app-title">Shot Scout</span>
       <div style="display:flex;gap:8px;align-items:center">
-        <button id="btn-snap-list" style="background:none;border:none;cursor:pointer;color:var(--accent);font-size:1.1rem;line-height:1;padding:4px" title="스냅슷 목록">📄</button>
+        <button id="btn-snap-list" style="background:none;border:none;cursor:pointer;color:var(--accent);font-size:1.1rem;line-height:1;padding:4px" title="스냅샷 목록">📄</button>
         <div id="profile-pill">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <circle cx="12" cy="12" r="3"/><path d="M3 12h1m16 0h1M12 3v1m0 16v1"/>
@@ -154,7 +158,7 @@ document.getElementById('app')!.innerHTML = `
       <div style="display:flex;gap:8px">
         <button class="btn primary" id="btn-cam" style="flex:1">📷 카메라 시작</button>
         <button class="btn" id="btn-add-profile">+ 프로필</button>
-        <button class="btn" id="btn-save-snap" title="스냅슷 저장">📌</button>
+        <button class="btn" id="btn-save-snap" title="스냅샷 저장">📌</button>
       </div>
       <div style="display:flex;gap:8px;align-items:center">
         <span style="font-size:.7rem;color:var(--muted);flex:1">카메라 방향</span>
@@ -189,11 +193,11 @@ document.getElementById('app')!.innerHTML = `
         <span style="font-size:.65rem;color:var(--muted);white-space:nowrap;align-self:center">목표</span>
         <button class="btn ratio-preset-btn" id="preset-any" data-min="0" data-max="99" data-name="없음">없음</button>
         <button class="btn ratio-preset-btn" id="preset-soft" data-min="2" data-max="4" data-name="소프트">소프트</button>
-        <button class="btn ratio-preset-btn" id="preset-rembrandt" data-min="4" data-max="6" data-name="렌브란트">렌브란트</button>
+        <button class="btn ratio-preset-btn" id="preset-rembrandt" data-min="4" data-max="6" data-name="렘브란트">렘브란트</button>
         <button class="btn ratio-preset-btn" id="preset-split" data-min="8" data-max="99" data-name="스플릿">스플릿</button>
       </div>
       <div class="info-chip" style="padding:10px 12px">
-        <span class="label">힙트</span>
+        <span class="label">힌트</span>
         <span style="font-size:.82rem;margin-top:4px" id="ratio-preset-hint">카메라를 시작하면 측정됩니다</span>
       </div>
     </div>
@@ -237,7 +241,7 @@ document.getElementById('app')!.innerHTML = `
 <div id="snap-modal-backdrop" class="hidden">
   <div class="modal-sheet">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-      <div class="modal-title">스냅슷 기록</div>
+      <div class="modal-title">스냅샷 기록</div>
       <button class="btn" id="btn-close-snap-modal" style="padding:6px 12px;font-size:.78rem">닫기</button>
     </div>
     <div id="snap-list" style="display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow-y:auto"></div>
@@ -429,15 +433,15 @@ function bindEvents() {
       id: `${now.getTime()}`,
       ts: now.getTime(),
       time: now.toISOString(),
-      solarElev: solarEl ? Math.round(solarEl * 10) / 10 : null,
-      solarAz: solarAz ? Math.round(solarAz * 10) / 10 : null,
+      solarElev: solarEl != null ? Math.round(solarEl * 10) / 10 : null,
+      solarAz: solarAz != null ? Math.round(solarAz * 10) / 10 : null,
       ratio: isNaN(ratioNum!) ? null : ratioNum,
       lens: activeProfile?.name ?? null,
-      lat: geoCoords ? Math.floor(geoCoords.lat * 100) / 100 : null,
-      lon: geoCoords ? Math.floor(geoCoords.lon * 100) / 100 : null,
+      lat: geoCoords?.lat ?? null,
+      lon: geoCoords?.lon ?? null,
     }
     saveSnapshot(entry)
-    showToast('스냅슷 저장됨')
+    showToast('스냅샷 저장됨')
   })
 
   // Snapshot list
@@ -566,18 +570,19 @@ function measureRatioFromVideo() {
 
   const ratioStr = `${result.ratio.toFixed(1)} : 1`
 
-  // 목표 프리셋 기준 색상/힙트 판정
+  // 목표 프리셋 기준 색상/힌트 판정
   let displayColor = result.color
   let displayHint  = result.hint
   if (ratioTarget && ratioTarget.name !== '없음') {
     const inRange = result.ratio >= ratioTarget.min && result.ratio <= ratioTarget.max
     displayColor = inRange ? '#81c784' : '#e57373'
+    const rangeStr = ratioTarget.max === 99 ? `${ratioTarget.min}:1+` : `${ratioTarget.min}:1~${ratioTarget.max}:1`
     if (inRange) {
-      displayHint = `✅ 목표 레인에 쟁습니다 (${ratioTarget.name})`
+      displayHint = `✅ 목표 범위입니다 (${ratioTarget.name})`
     } else if (result.ratio < ratioTarget.min) {
-      displayHint = `⬆ 더 측면으로 돌리세요 — 목표 ${ratioTarget.name} (${ratioTarget.min}:1~${ratioTarget.max === 99 ? '+' : ratioTarget.max + ':1'})`
+      displayHint = `⬆ 더 측면으로 돌아서세요 — 목표 ${ratioTarget.name} (${rangeStr})`
     } else {
-      displayHint = `⬇ 조명을 더 영어주세요 — 목표 ${ratioTarget.name} (${ratioTarget.min}:1~${ratioTarget.max === 99 ? '+' : ratioTarget.max + ':1'})`
+      displayHint = `⬇ 더 정면으로 돌아서세요 — 목표 ${ratioTarget.name} (${rangeStr})`
     }
   }
 
@@ -646,7 +651,7 @@ function renderSnapList() {
   const list = loadSnapshots()
   const el = document.getElementById('snap-list')!
   if (list.length === 0) {
-    el.innerHTML = '<p style="color:var(--muted);font-size:.82rem;text-align:center;padding:20px">저장된 스냅슷이 없습니다</p>'
+    el.innerHTML = '<p style="color:var(--muted);font-size:.82rem;text-align:center;padding:20px">저장된 스냅샷이 없습니다</p>'
     return
   }
   el.innerHTML = list.map(s => {
@@ -654,7 +659,7 @@ function renderSnapList() {
     const dateStr = d.toLocaleDateString('ko', { month:'2-digit', day:'2-digit' })
     const timeStr = d.toLocaleTimeString('ko', { hour:'2-digit', minute:'2-digit' })
     const rows = [
-      s.lens ? `🔦 ${s.lens}` : '',
+      s.lens ? `🔦 ${esc(s.lens)}` : '',
       s.solarElev != null ? `☀️ 고도 ${s.solarElev}° / 방위각 ${s.solarAz}°` : '',
       s.ratio != null ? `📊 레이시오 ${s.ratio.toFixed(1)}:1` : '',
       s.lat != null ? `📍 ${s.lat}, ${s.lon}` : '',
@@ -684,7 +689,7 @@ function openProfileModal() {
   const sel   = document.getElementById('modal-profile-select') as HTMLSelectElement
   const profiles = listProfiles()
   sel.innerHTML = profiles.map(p =>
-    `<option value="${p.id}" ${p.id === activeProfile?.id ? 'selected' : ''}>${p.name}</option>`
+    `<option value="${p.id}" ${p.id === activeProfile?.id ? 'selected' : ''}>${esc(p.name)}</option>`
   ).join('')
   modal.classList.remove('hidden')
 }

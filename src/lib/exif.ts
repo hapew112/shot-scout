@@ -104,11 +104,12 @@ export function parseExif(buf: ArrayBuffer): ExifData {
   if (view.byteLength < 4) return out as ExifData
   if (view.getUint8(0) !== 0xFF || view.getUint8(1) !== 0xD8) return out as ExifData
 
-  // APP1 세그먼트(0xFFE1) 검색
+  // APP1 세그먼트(0xFFE1) 검색 — XMP 등 다른 APP1이 Exif보다 앞설 수 있어 Exif를 찾을 때까지 계속 스캔
   let offset = 2
   while (offset + 4 < view.byteLength) {
     const marker = view.getUint16(offset)
     const segLen = view.getUint16(offset + 2)
+    if (marker === 0xFFDA) break  // SOS 이후는 압축 데이터
     if (marker === 0xFFE1) {
       // "Exif\0\0" 헤더 확인
       if (offset + 10 < view.byteLength) {
@@ -138,9 +139,9 @@ export function parseExif(buf: ArrayBuffer): ExifData {
               }
             }
           } catch { /* ok */ }
+          break
         }
       }
-      break
     }
     if (segLen < 2) break
     offset += 2 + segLen

@@ -5,6 +5,7 @@ import { getSolarPosition, azimuthLabel } from './lib/solar'
 import { getCurrentPosition } from './lib/geo'
 import { requestOrientationPermission, getCompassHeading } from './lib/orientation'
 import { measureRatio } from './lib/ratio'
+import { parseExif, fovFromF35 } from './lib/exif'
 import type { LensProfile } from './store/profiles'
 import {
   ensureDefaults, listProfiles, saveProfile, deleteProfile,
@@ -14,7 +15,7 @@ import {
 // ── State ─────────────────────────────────────────
 let mode: 'lens' | 'solar' | 'ratio' = 'lens'
 let activeProfile: LensProfile | null = null
-let phoneFovH = 70
+let phoneFovH = Number(localStorage.getItem('phoneFovH') ?? 70)
 let geoCoords: { lat: number; lon: number } | null = null
 let compassHeading = 0
 let cameraStarted = false
@@ -111,8 +112,12 @@ document.getElementById('app')!.innerHTML = `
       </div>
       <div class="slider-row">
         <span class="slider-label">폰 FOV</span>
-        <input type="range" id="phone-fov-slider" min="50" max="100" step="1" value="70">
-        <span class="slider-val" id="phone-fov-val">70°</span>
+        <input type="range" id="phone-fov-slider" min="50" max="100" step="1" value="${phoneFovH}">
+        <span class="slider-val" id="phone-fov-val">${phoneFovH}°</span>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:2px">
+        <button class="btn" id="btn-calibrate" style="flex:1;font-size:.75rem">📸 폰 화각 캘리브레이션</button>
+        <input type="file" id="inp-phone-photo" accept="image/jpeg" style="display:none">
       </div>
       <div style="display:flex;gap:8px">
         <button class="btn primary" id="btn-cam" style="flex:1">📷 카메라 시작</button>
@@ -164,6 +169,11 @@ document.getElementById('app')!.innerHTML = `
     </div>
     <hr style="border:none;border-top:1px solid var(--border)">
     <div class="modal-title" style="font-size:.9rem">새 프로필 추가</div>
+    <div style="display:flex;gap:8px">
+      <button class="btn" id="btn-import-exif" style="flex:1;font-size:.75rem">📷 사진에서 가져오기</button>
+      <input type="file" id="inp-camera-photo" accept="image/jpeg" style="display:none">
+    </div>
+    <p id="exif-import-hint" style="font-size:.7rem;color:var(--muted);margin:0">실제 카메라 JPEG를 선택하면 초점거리·조리개·모델명이 자동 입력됩니다. 줌렌즈는 촬영 시점의 초점거리 기준입니다.</p>
     <div class="modal-row"><label>이름</label><input id="inp-name" placeholder="Sony A7IV + 85mm f/1.4"></div>
     <div class="modal-row"><label>초점거리 (mm)</label><input id="inp-focal" type="number" value="85" min="8" max="1200"></div>
     <div class="modal-row"><label>센서 크기</label>
@@ -267,6 +277,58 @@ function bindEvents() {
   phoneFovSlider.addEventListener('input', () => {
     phoneFovH = Number(phoneFovSlider.value)
     document.getElementById('phone-fov-val')!.textContent = `${phoneFovH}°`
+    localStorage.setItem('phoneFovH', String(phoneFovH))
+  })
+
+  // Phone calibration via EXIF
+  const inpPhonePhoto = document.getElementById('inp-phone-photo') as HTMLInputElement
+  document.getElementById('btn-calibrate')!.addEventListener('click', () => inpPhonePhoto.click())
+  inpPhonePhoto.addEventListener('change', async () => {
+    const file = inpPhonePhoto.files?.[0]
+    if (!file) return
+    if (!file.type.includes('jpeg') && !file.name.toLowerCase().endsWith('.jpg')) {
+      showToast('JPEG 사진을 선택해주세요'); return
+    }
+    const buf = await file.arrayBuffer()
+    const exif = parseExif(buf)
+    if (!exif.focalLength35mm) {
+      showToast('FocalLengthIn35mm 태그 없음 — 슬라이더로 수동 설정하세요'); return
+    }
+    const calFov = Math.round(fovFromF35(exif.focalLength35mm))
+    phoneFovH = Math.max(50, Math.min(100, calFov))
+    ;(document.getElementById('phone-fov-slider') as HTMLInputElement).value = String(phoneFovH)
+    document.getElementById('phone-fov-val')!.textContent = `${phoneFovH}°`
+    localStorage.setItem('phoneFovH', String(phoneFovH))
+    showToast(`폰 화각 캘리브레이션 완료 — ${phoneFovH}°`)
+    inpPhonePhoto.value = ''
+  })
+
+  // Camera photo → profile import
+  const inpCameraPhoto = document.getElementById('inp-camera-photo') as HTMLInputElement
+  document.getElementById('btn-import-exif')!.addEventListener('click', () => inpCameraPhoto.click())
+  inpCameraPhoto.addEventListener('change', async () => {
+    const file = inpCameraPhoto.files?.[0]
+    if (!file) return
+    if (!file.type.includes('jpeg') && !file.name.toLowerCase().endsWith('.jpg')) {
+      showToast('JPEG 사진을 선택해주세요'); return
+    }
+    const buf = await file.arrayBuffer()
+    const exif = parseExif(buf)
+    if (!exif.focalLengthMm && !exif.fNumber && !exif.model) {
+      showToast('EXIF 태그를 읽을 수 없습니다'); return
+    }
+    if (exif.focalLengthMm) {
+      ;(document.getElementById('inp-focal') as HTMLInputElement).value = String(Math.round(exif.focalLengthMm))
+    }
+    if (exif.fNumber) {
+      ;(document.getElementById('inp-aperture') as HTMLInputElement).value = exif.fNumber.toFixed(1)
+    }
+    const model = exif.model ?? '카메라'
+    const focal = exif.focalLengthMm ? `${Math.round(exif.focalLengthMm)}mm` : ''
+    const fn    = exif.fNumber ? ` f/${exif.fNumber.toFixed(1)}` : ''
+    ;(document.getElementById('inp-name') as HTMLInputElement).value = `${model}${focal ? ' + ' + focal : ''}${fn}`
+    showToast('EXIF 자동 입력 완료')
+    inpCameraPhoto.value = ''
   })
 
   // Geo button
